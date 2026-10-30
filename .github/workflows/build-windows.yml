@@ -59,7 +59,13 @@ jobs:
           }
           Copy-Item README.md out/Curio/
           Compress-Archive -Path out/Curio -DestinationPath Curio-Windows-VST3.zip -Force
-          Get-ChildItem out/Curio
+          # one zip per plugin, for individual download links
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Move-Item Curio-Windows-VST3.zip dist/
+          foreach ($p in "Jitter","Repitch","Duck","KeytrackRes","CombPluck","Manifest","Mudpie","SpectralOTT") {
+            Compress-Archive -Path "out/Curio/$p.vst3" -DestinationPath "dist/$p-Windows-VST3.zip" -Force
+          }
+          Get-ChildItem dist
 
       - name: Upload
         uses: actions/upload-artifact@v4
@@ -74,7 +80,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release delete windows-latest --yes --cleanup-tag || true
-          gh release create windows-latest Curio-Windows-VST3.zip \
+          gh release create windows-latest dist/*.zip \
             --title "Curio for Windows (latest build)" \
-            --notes "All eight Curio VST3 plugins for Windows (64-bit). Unzip and copy the .vst3 folders into C:\\Program Files\\Common Files\\VST3, then rescan plugins in Ableton." \
+            --notes "Curio VST3 plugins for Windows (64-bit). Curio-Windows-VST3.zip has all eight; the other zips are one plugin each. Unzip and copy the .vst3 folders into C:\\Program Files\\Common Files\\VST3, then rescan plugins in Ableton." \
             --target "${{ github.sha }}"
