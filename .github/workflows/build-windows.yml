@@ -41,8 +41,13 @@ jobs:
           set -o pipefail
           ARGS=""
           for p in Jitter Repitch Duck KeytrackRes CombPluck Manifest Mudpie SpectralOTT; do ARGS="$ARGS build/${p}_artefacts/Release/VST3/$p.vst3"; done
-          build/curio_smoke_artefacts/Release/curio_smoke.exe $ARGS 2>&1 | tee smoke.log \
-            || { echo "::error title=smoke::$(grep -E 'FAIL|silent|failed' smoke.log | tail -c 5000 | tr '\n' ' ')"; exit 1; }
+          ls -la build/curio_smoke_artefacts/Release/ || true
+          set +e
+          build/curio_smoke_artefacts/Release/curio_smoke.exe $ARGS > smoke.log 2>&1
+          code=$?
+          set -e
+          cat smoke.log
+          if [ $code -ne 0 ]; then echo "::error title=smoke (exit $code)::$(tail -c 4000 smoke.log | tr '\n' ' ')"; exit 1; fi
           echo "::notice title=smoke::$(grep -E 'PASS|FAIL' smoke.log | tr '\n' ' ')"
 
       - name: Package

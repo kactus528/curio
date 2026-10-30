@@ -4,15 +4,22 @@
 #include <juce_audio_utils/juce_audio_utils.h>
 #include <cstdio>
 
+static void step(const char* what, const juce::String& name) { std::printf("  .. %s: %s\n", name.toRawUTF8(), what); std::fflush(stdout); }
+
 static int testPlugin(juce::VST3PluginFormat& fmt, const juce::String& path) {
+    const auto shortName = juce::File(path).getFileNameWithoutExtension();
+    step("scanning", shortName);
+    if (!juce::File(path).exists()) { std::printf("FAIL  %s: file missing\n", path.toRawUTF8()); return 1; }
     juce::OwnedArray<juce::PluginDescription> types;
     fmt.findAllTypesForFile(types, path);
     if (types.isEmpty()) { std::printf("FAIL  %s: no plugin found in file\n", path.toRawUTF8()); return 1; }
     const auto& desc = *types[0];
     juce::String err;
+    step("instantiating", shortName);
     auto inst = fmt.createInstanceFromDescription(desc, 48000.0, 512, err);
     if (!inst) { std::printf("FAIL  %s: could not instantiate (%s)\n", desc.name.toRawUTF8(), err.toRawUTF8()); return 1; }
 
+    step("preparing", shortName);
     inst->enableAllBuses();
     const int ins = inst->getTotalNumInputChannels(), outs = inst->getTotalNumOutputChannels();
     inst->setPlayConfigDetails(ins, outs, 48000.0, 512);
@@ -24,6 +31,7 @@ static int testPlugin(juce::VST3PluginFormat& fmt, const juce::String& path) {
     const int programs = std::max(1, inst->getNumPrograms());
     long sample = 0;
     for (int prog = 0; prog < programs; ++prog) {
+        if (prog == 0) step("processing presets", shortName);
         inst->setCurrentProgram(prog);
         double sum = 0; long count = 0;
         for (int b = 0; b < 200; ++b) {   // ~2.1 s per preset
@@ -53,22 +61,27 @@ static int testPlugin(juce::VST3PluginFormat& fmt, const juce::String& path) {
         if (rms < 1.0e-4) std::printf("      silent preset %d (%s)\n", prog, inst->getProgramName(prog).toRawUTF8());
     }
     bool editorOk = true;
+    step("opening editor", shortName);
     if (inst->hasEditor()) {
         std::unique_ptr<juce::AudioProcessorEditor> ed(inst->createEditor());
         editorOk = ed != nullptr && ed->getWidth() > 100 && ed->getHeight() > 100;
         if (ed) std::printf("      editor %d x %d\n", ed->getWidth(), ed->getHeight());
     }
+    step("release + state round-trip", shortName);
     inst->releaseResources();
     // state round-trip
     juce::MemoryBlock state; inst->getStateInformation(state); inst->setStateInformation(state.getData(), (int)state.getSize());
 
     const bool ok = bad == 0 && worstRms > 1.0e-4 && editorOk;
+    std::fflush(stdout);
     std::printf("%s  %-12s presets %d  latency %d  rms min %.4f max %.4f  bad samples %d  editor %s\n",
         ok ? "PASS" : "FAIL", desc.name.toRawUTF8(), programs, inst->getLatencySamples(), worstRms, bestRms, bad, editorOk ? "ok" : "BROKEN");
     return ok ? 0 : 1;
 }
 
 int main(int argc, char** argv) {
+    std::setvbuf(stdout, nullptr, _IONBF, 0);
+    std::printf("smoke host: %d plugins\n", argc - 1);
     juce::ScopedJuceInitialiser_GUI init;
     juce::VST3PluginFormat fmt;
     int failures = 0;
