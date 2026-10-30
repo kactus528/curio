@@ -1,0 +1,65 @@
+name: Build Windows VST3
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        shell: bash
+        run: |
+          set -o pipefail
+          cmake -B build -A x64 -DCURIO_STANDALONE=OFF 2>&1 | tee configure.log \
+            || { echo "::error title=configure::$(tail -c 6000 configure.log | tr '\n' ' ')"; exit 1; }
+
+      - name: Engine tests (offline render, all 8 engines)
+        shell: bash
+        run: |
+          set -o pipefail
+          cmake --build build --config Release --target curio_render_test 2>&1 | tee test-build.log \
+            || { echo "::error title=test build::$(grep -E 'error' test-build.log | tail -c 6000 | tr '\n' ' ')"; exit 1; }
+          mkdir -p renders && cd renders && ../build/Release/curio_render_test.exe
+
+      - name: Build plugins
+        shell: bash
+        run: |
+          set -o pipefail
+          cmake --build build --config Release --parallel --target Jitter_VST3 Repitch_VST3 Duck_VST3 KeytrackRes_VST3 CombPluck_VST3 Manifest_VST3 Mudpie_VST3 SpectralOTT_VST3 2>&1 | tee build.log \
+            || { echo "::error title=build::$(grep -E ' error ' build.log | tail -c 6000 | tr '\n' ' ')"; exit 1; }
+
+      - name: Package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force out/Curio | Out-Null
+          foreach ($p in "Jitter","Repitch","Duck","KeytrackRes","CombPluck","Manifest","Mudpie","SpectralOTT") {
+            Copy-Item -Recurse "build/${p}_artefacts/Release/VST3/$p.vst3" out/Curio/
+          }
+          Copy-Item README.md out/Curio/
+          Compress-Archive -Path out/Curio -DestinationPath Curio-Windows-VST3.zip -Force
+          Get-ChildItem out/Curio
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: Curio-Windows-VST3
+          path: out/Curio
+
+      - name: Publish as a GitHub Release (stable download link)
+        if: github.ref == 'refs/heads/main'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete windows-latest --yes --cleanup-tag || true
+          gh release create windows-latest Curio-Windows-VST3.zip \
+            --title "Curio for Windows (latest build)" \
+            --notes "All eight Curio VST3 plugins for Windows (64-bit). Unzip and copy the .vst3 folders into C:\\Program Files\\Common Files\\VST3, then rescan plugins in Ableton." \
+            --target "${{ github.sha }}"

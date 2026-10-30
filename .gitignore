@@ -1,0 +1,4 @@
+build/
+JUCE/
+*.wav
+.vs/
