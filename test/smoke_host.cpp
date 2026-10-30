@@ -4,6 +4,8 @@
 #include <juce_audio_utils/juce_audio_utils.h>
 #include <cstdio>
 #if JUCE_WINDOWS
+ #define NOMINMAX
+ #define WIN32_LEAN_AND_MEAN
  #include <windows.h>
 static LONG WINAPI crashFilter(EXCEPTION_POINTERS* e) {
     std::printf("CRASH  exception 0x%08lx at %p\n", e->ExceptionRecord->ExceptionCode, e->ExceptionRecord->ExceptionAddress);
