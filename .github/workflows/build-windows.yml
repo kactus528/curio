@@ -47,7 +47,7 @@ jobs:
           code=$?
           set -e
           cat smoke.log
-          if [ $code -ne 0 ]; then echo "::error title=smoke (exit $code)::$(tail -c 4000 smoke.log | tr '\n' ' ')"; exit 1; fi
+          if [ $code -ne 0 ]; then echo "::error title=smoke (exit $code)::$(tail -c 4000 smoke.log | tr -d '\r' | tr '\n' '|')"; exit 1; fi
           echo "::notice title=smoke::$(grep -E 'PASS|FAIL' smoke.log | tr '\n' ' ')"
 
       - name: Package
