@@ -37,6 +37,7 @@ function(curio_plugin NAME CODE SYNTH MIDI CATS DIR)
         NEEDS_MIDI_INPUT ${MIDI}
         NEEDS_MIDI_OUTPUT FALSE
         VST3_CATEGORIES ${CATS}
+        VST3_AUTO_MANIFEST FALSE
         COPY_PLUGIN_AFTER_BUILD FALSE)
     file(GLOB SRC "${CMAKE_CURRENT_SOURCE_DIR}/plugins/${DIR}/*.cpp")
     target_sources(${NAME} PRIVATE ${SRC})
@@ -58,3 +59,11 @@ curio_plugin(SpectralOTT  Cspo FALSE FALSE "Fx|Dynamics"     SpectralOTT)
 
 # Offline engine test (no JUCE): ctest / run curio_render_test
 add_executable(curio_render_test test/render_all.cpp)
+
+# Smoke host: loads the built .vst3 files like a DAW would (used by CI)
+juce_add_console_app(curio_smoke PRODUCT_NAME "curio_smoke")
+target_sources(curio_smoke PRIVATE test/smoke_host.cpp)
+target_compile_definitions(curio_smoke PRIVATE
+    JUCE_PLUGINHOST_VST3=1 JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0 JUCE_DISPLAY_SPLASH_SCREEN=0)
+target_link_libraries(curio_smoke PRIVATE juce::juce_audio_utils juce::juce_audio_processors
+    PUBLIC juce::juce_recommended_config_flags)

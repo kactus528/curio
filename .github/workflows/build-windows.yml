@@ -32,8 +32,18 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          cmake --build build --config Release --parallel --target Jitter_VST3 Repitch_VST3 Duck_VST3 KeytrackRes_VST3 CombPluck_VST3 Manifest_VST3 Mudpie_VST3 SpectralOTT_VST3 2>&1 | tee build.log \
-            || { echo "::error title=build::$(grep -E ' error ' build.log | tail -c 6000 | tr '\n' ' ')"; exit 1; }
+          cmake --build build --config Release --parallel --target Jitter_VST3 Repitch_VST3 Duck_VST3 KeytrackRes_VST3 CombPluck_VST3 Manifest_VST3 Mudpie_VST3 SpectralOTT_VST3 curio_smoke 2>&1 | tee build.log \
+            || { echo "::error title=build::$(grep -E 'error [A-Z]+[0-9]+|fatal error|exited with code' build.log | grep -v 'MSB3073: *(setlocal|if %|:cm|endlocal|exit /b|\"C:)' | sort -u | tail -c 5000 | tr '\n' ' ')"; exit 1; }
+
+      - name: Smoke test (load each VST3 like a DAW, every preset, editor)
+        shell: bash
+        run: |
+          set -o pipefail
+          ARGS=""
+          for p in Jitter Repitch Duck KeytrackRes CombPluck Manifest Mudpie SpectralOTT; do ARGS="$ARGS build/${p}_artefacts/Release/VST3/$p.vst3"; done
+          build/curio_smoke_artefacts/Release/curio_smoke.exe $ARGS 2>&1 | tee smoke.log \
+            || { echo "::error title=smoke::$(grep -E 'FAIL|silent|failed' smoke.log | tail -c 5000 | tr '\n' ' ')"; exit 1; }
+          echo "::notice title=smoke::$(grep -E 'PASS|FAIL' smoke.log | tr '\n' ' ')"
 
       - name: Package
         shell: pwsh
