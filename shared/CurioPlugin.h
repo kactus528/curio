@@ -130,8 +130,6 @@ public:
         return t;
     }
 
-    juce::AudioProcessorValueTreeState apvts;  // public for attachments
-
 private:
     static juce::AudioProcessorValueTreeState::ParameterLayout makeLayout(const std::vector<ParamSpec>& specs) {
         juce::AudioProcessorValueTreeState::ParameterLayout layout;
@@ -159,11 +157,16 @@ private:
         return layout;
     }
 
+    // NOTE: declaration order matters. specs_/presets_/info_ must be constructed
+    // before apvts, because apvts is built from specs_ in the constructor.
     std::vector<ParamSpec> specs_;
     std::vector<Preset> presets_;
     PluginInfo info_;
     std::map<std::string, std::atomic<float>*> raw_;
     int current_ = 0;
+
+public:
+    juce::AudioProcessorValueTreeState apvts;  // public for attachments
 };
 
 // ------------------------------------------------------------------------
