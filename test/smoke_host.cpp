@@ -3,6 +3,14 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_audio_utils/juce_audio_utils.h>
 #include <cstdio>
+#if JUCE_WINDOWS
+ #include <windows.h>
+static LONG WINAPI crashFilter(EXCEPTION_POINTERS* e) {
+    std::printf("CRASH  exception 0x%08lx at %p\n", e->ExceptionRecord->ExceptionCode, e->ExceptionRecord->ExceptionAddress);
+    std::fflush(stdout);
+    return EXCEPTION_EXECUTE_HANDLER;
+}
+#endif
 
 static void step(const char* what, const juce::String& name) { std::printf("  .. %s: %s\n", name.toRawUTF8(), what); std::fflush(stdout); }
 
@@ -82,10 +90,20 @@ static int testPlugin(juce::VST3PluginFormat& fmt, const juce::String& path) {
 int main(int argc, char** argv) {
     std::setvbuf(stdout, nullptr, _IONBF, 0);
     std::printf("smoke host: %d plugins\n", argc - 1);
+   #if JUCE_WINDOWS
+    SetUnhandledExceptionFilter(crashFilter);
+   #endif
+    std::printf("  init juce\n");
     juce::ScopedJuceInitialiser_GUI init;
+    std::printf("  create vst3 format\n");
     juce::VST3PluginFormat fmt;
+    std::printf("  ready\n");
     int failures = 0;
-    for (int i = 1; i < argc; ++i) failures += testPlugin(fmt, juce::File::getCurrentWorkingDirectory().getChildFile(argv[i]).getFullPathName());
+    for (int i = 1; i < argc; ++i) {
+        std::printf("  arg %d: %s\n", i, argv[i]);
+        auto path = juce::File::getCurrentWorkingDirectory().getChildFile(juce::String(argv[i])).getFullPathName();
+        failures += testPlugin(fmt, path);
+    }
     std::printf("\n%d of %d plugins failed\n", failures, argc - 1);
     return failures ? 1 : 0;
 }
